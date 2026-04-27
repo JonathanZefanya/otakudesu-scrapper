@@ -125,12 +125,12 @@ An UNOFFICIAL rest API for [otakudesu](https://otakudesu.lol). Otakudesu is a we
 
 - Open up your terminal, then run this command to clone this repo
 ```bash
-$ git clone https://github.com/rzkfyn/otakudesu-unofficial-api.git
+$ git clone https://github.com/JonathanZefanya/otakudesu-scrapper.git
 ```
 
 - Then cd into the project root directory 
 ```bash
-$ cd otakudesu-unofficial-api
+$ cd otakudesu-scrapper
 ```
 
 - Inside the project root directory, run this command to install all the dependencies
