@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import './src/lib/configureAxios.js';
 import routes from './routes/routes.js';
 import 'dotenv/config';
 
