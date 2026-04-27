@@ -7,7 +7,10 @@ const globalState = globalThis as typeof globalThis & {
 };
 
 if (!globalState[GLOBAL_CONFIG_KEY]) {
-  const baseUrl = process.env.BASEURL?.replace(/\/+$/, '') || 'https://otakudesu.blog';
+  const resolvedBaseUrl = process.env.BASEURL?.replace(/\/+$/, '') || 'https://otakudesu.blog';
+  process.env.BASEURL = resolvedBaseUrl;
+
+  const baseUrl = resolvedBaseUrl;
   const timeout = Number(process.env.REQUEST_TIMEOUT_MS || '15000');
 
   axios.defaults.timeout = Number.isFinite(timeout) ? timeout : 15000;
@@ -19,6 +22,8 @@ if (!globalState[GLOBAL_CONFIG_KEY]) {
     'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8';
   axios.defaults.headers.common['Accept-Language'] = 'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7';
   axios.defaults.headers.common.Referer = `${baseUrl}/`;
+
+  console.log(`[scraper] BASEURL=${baseUrl}`);
 
   globalState[GLOBAL_CONFIG_KEY] = true;
 }
