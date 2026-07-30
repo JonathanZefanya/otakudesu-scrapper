@@ -13,6 +13,10 @@ export const sources = {
 	},
 	kuramanime: {
 		baseUrl: "https://v19.kuramanime.ing",
+		// Cloudflare di Kuramanime memblokir IP datacenter: dari Vercel selalu
+		// dibalas 403, dari IP rumah/lokal tetap 200. Route-nya dibiarkan hidup
+		// supaya bisa dipakai saat pengembangan; frontend yang menyembunyikan
+		// sumber ini di build produksi.
 		name: "Kuramanime",
 		enabled: true,
 		cacheTtl: 10,
