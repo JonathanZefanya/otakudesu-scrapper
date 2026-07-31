@@ -65,14 +65,25 @@ export function autoSync(sourceId: string) {
 	};
 }
 
+/** Slug dari URL anime, dipakai untuk item yang hanya membawa tautan. */
+function slugFromUrl(url: unknown): string {
+	if (typeof url !== "string" || !url) return "";
+
+	return url.split("?")[0]!.split("/").filter(Boolean).pop() ?? "";
+}
+
 /**
  * Normalkan kartu anime dari response menjadi baris tabel `anime`.
  *
- * Tiap sumber memakai nama field berbeda untuk slug: otakudesu mengirim
- * `animeId`, sementara nimegami/kuramanime/oploverz mengirim `slug`. Kolom
- * `slug` dan `title` di database NOT NULL, dan satu batch upsert ditolak
- * seluruhnya kalau ada satu baris yang kosong — jadi entri tanpa slug dibuang
- * di sini, bukan diserahkan ke Postgres.
+ * Bentuk response tidak seragam:
+ * - nama field slug berbeda per sumber — otakudesu memakai `animeId`,
+ *   sumber lain `slug`, dan sebagian hanya punya `url`;
+ * - endpoint A-Z dan jadwal rilis mengembalikan kelompok berisi `animeList`,
+ *   bukan kartu anime langsung.
+ *
+ * Kolom `slug` dan `title` NOT NULL di database dan satu batch upsert ditolak
+ * seluruhnya kalau ada satu baris kosong, jadi entri tak lengkap dibuang di
+ * sini alih-alih diserahkan ke Postgres.
  */
 function toAnimeRows(items: unknown[]): Array<{
 	slug: string;
@@ -83,12 +94,20 @@ function toAnimeRows(items: unknown[]): Array<{
 	score?: string;
 	episode?: string;
 }> {
-	return items
+	const flat = items.flatMap((raw) => {
+		const item = (raw ?? {}) as Record<string, any>;
+		return Array.isArray(item.animeList) ? item.animeList : [item];
+	});
+
+	return flat
 		.map((raw) => {
 			const item = (raw ?? {}) as Record<string, any>;
+			const slug =
+				String(item.slug ?? item.animeId ?? item.anime_id ?? "").trim() ||
+				slugFromUrl(item.url ?? item.sourceUrl);
 
 			return {
-				slug: String(item.slug ?? item.animeId ?? item.anime_id ?? "").trim(),
+				slug,
 				title: String(item.title ?? "").trim(),
 				poster: item.poster || undefined,
 				type: item.type || undefined,
