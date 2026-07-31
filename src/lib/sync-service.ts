@@ -55,30 +55,39 @@ export async function syncAnimeList(
 	if (!isSupabaseReady()) return 0;
 
 	const now = new Date().toISOString();
-	const rows = animeList.map((a) => ({
-		source_id: source,
-		slug: a.slug,
-		title: a.title,
-		poster: a.poster || null,
-		type: a.type || null,
-		status: a.status || null,
-		score: a.score || null,
-		episode_count: a.episode || null,
-		updated_at: now,
-	}));
+	// `slug` dan `title` NOT NULL di database, dan seluruh batch ditolak kalau
+	// satu baris saja kosong. Entri tak lengkap dibuang lebih dulu supaya sisa
+	// datanya tetap tersimpan.
+	const rows = animeList
+		.filter((a) => a?.slug && a?.title)
+		.map((a) => ({
+			source_id: source,
+			slug: a.slug,
+			title: a.title,
+			poster: a.poster || null,
+			type: a.type || null,
+			status: a.status || null,
+			score: a.score || null,
+			episode_count: a.episode || null,
+			updated_at: now,
+		}));
 
 	if (!rows.length) return 0;
 
+	// Postgres menolak upsert yang menyentuh baris sama dua kali dalam satu
+	// perintah, jadi slug ganda dalam satu batch disatukan dulu.
+	const deduped = [...new Map(rows.map((row) => [row.slug, row])).values()];
+
 	const { error } = await supabase!
 		.from("anime")
-		.upsert(rows, { onConflict: "source_id,slug" });
+		.upsert(deduped, { onConflict: "source_id,slug" });
 
 	if (error) {
 		console.error(`[sync] anime upsert error: ${error.message}`);
 		return 0;
 	}
 
-	return rows.length;
+	return deduped.length;
 }
 
 export async function syncAnimeDetails(

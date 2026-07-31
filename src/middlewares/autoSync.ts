@@ -66,6 +66,41 @@ export function autoSync(sourceId: string) {
 }
 
 /**
+ * Normalkan kartu anime dari response menjadi baris tabel `anime`.
+ *
+ * Tiap sumber memakai nama field berbeda untuk slug: otakudesu mengirim
+ * `animeId`, sementara nimegami/kuramanime/oploverz mengirim `slug`. Kolom
+ * `slug` dan `title` di database NOT NULL, dan satu batch upsert ditolak
+ * seluruhnya kalau ada satu baris yang kosong — jadi entri tanpa slug dibuang
+ * di sini, bukan diserahkan ke Postgres.
+ */
+function toAnimeRows(items: unknown[]): Array<{
+	slug: string;
+	title: string;
+	poster?: string;
+	type?: string;
+	status?: string;
+	score?: string;
+	episode?: string;
+}> {
+	return items
+		.map((raw) => {
+			const item = (raw ?? {}) as Record<string, any>;
+
+			return {
+				slug: String(item.slug ?? item.animeId ?? item.anime_id ?? "").trim(),
+				title: String(item.title ?? "").trim(),
+				poster: item.poster || undefined,
+				type: item.type || undefined,
+				status: item.status || undefined,
+				score: item.score || item.rating || undefined,
+				episode: item.episodes || item.episode || undefined,
+			};
+		})
+		.filter((item) => item.slug && item.title);
+}
+
+/**
  * Sync response body ke Supabase berdasarkan type.
  */
 async function syncResponse(source: string, type: string, body: unknown): Promise<void> {
@@ -88,16 +123,14 @@ async function syncResponse(source: string, type: string, body: unknown): Promis
 			case "search":
 			case "anime": {
 				if (Array.isArray(data)) {
-					count = await syncService.syncAnimeList(source, data) || data.length;
+					count = await syncService.syncAnimeList(source, toAnimeRows(data));
 				} else if (data?.ongoing || data?.completed) {
 					const homeData = data as any;
 					if (Array.isArray(homeData.ongoing)) {
-						const c = await syncService.syncAnimeList(source, homeData.ongoing) || 0;
-						count += c;
+						count += await syncService.syncAnimeList(source, toAnimeRows(homeData.ongoing));
 					}
 					if (Array.isArray(homeData.completed)) {
-						const c = await syncService.syncAnimeList(source, homeData.completed) || 0;
-						count += c;
+						count += await syncService.syncAnimeList(source, toAnimeRows(homeData.completed));
 					}
 				}
 				break;
@@ -118,12 +151,7 @@ async function syncResponse(source: string, type: string, body: unknown): Promis
 			case "schedule":
 				// Schedule items usually contain anime references
 				if (Array.isArray(data)) {
-					const animeCards = data.map((item: any) => ({
-						slug: item.slug || item.animeId || "",
-						title: item.title || "",
-						poster: item.poster || "",
-					})).filter((a) => a.slug && a.title);
-					count = await syncService.syncAnimeList(source, animeCards) || animeCards.length;
+					count = await syncService.syncAnimeList(source, toAnimeRows(data));
 				}
 				break;
 		}
